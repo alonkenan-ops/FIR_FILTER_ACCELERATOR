@@ -1,0 +1,87 @@
+%% FIR Filter Audio Processing - 16 Taps
+clear; clc; close all;
+
+
+% 1. Load audio file
+% Using a built-in Matlab sample for testing
+[audioIn, Fs] = audioread('untitled.wav'); 
+audioIn = audioIn(:,1); % Convert to Mono if Stereo
+
+% Generate a high-frequency noise (e.g., 8kHz beep)
+t_audio = (0:length(audioIn)-1)'/Fs;
+noise = 0.1 * sin(2*pi*8000*t_audio); 
+
+% Add noise to the original signal
+audioIn_noisy = audioIn + noise;
+
+
+
+% 2. Design 16-tap FIR Filter
+% Using fir1 to create a Band-Pass filter as discussed
+% Normalizing frequencies: (Freq / (Fs/2))
+f_low  = 300; 
+f_high = 3000;
+h = fir1(15, [f_low f_high]/(Fs/2), 'bandpass'); 
+
+
+% Apply your filter
+audioOut = filter(h, 1, audioIn_noisy);
+
+% 4. Audio Playback
+disp('Playing Original Audio...');
+sound(audioIn, Fs);
+pause(length(audioIn)/Fs + 1); 
+
+% --- Add this under the audio playback section ---
+
+% Play Noisy (The one we want to fix)
+disp('Playing 2: Noisy Audio (with 8kHz beep)...');
+sound(audioIn_noisy, Fs);
+pause(length(audioIn_noisy)/Fs + 1); % Wait for noisy audio to finish
+
+% Play Filtered (The result)
+disp('Playing 3: Filtered Audio (Noise Removed)...');
+sound(audioOut, Fs);
+
+% 5. Visualization - Time Domain
+t = (0:length(audioIn)-1)/Fs;
+figure('Name', 'FIR Filter Analysis', 'Position', [100, 100, 1000, 600]);
+
+subplot(2,2,1);
+plot(t, audioIn);
+title('Original Signal (Time Domain)');
+xlabel('Time [s]'); ylabel('Amplitude'); grid on;
+
+subplot(2,2,2);
+plot(t, audioOut, 'r');
+title('Filtered Signal (Time Domain)');
+xlabel('Time [s]'); ylabel('Amplitude'); grid on;
+
+% 6. Visualization - Frequency Domain (FFT)
+L = length(audioIn);
+f = Fs*(0:(L/2))/L;
+
+Y_in  = abs(fft(audioIn)/L);
+P_in  = Y_in(1:L/2+1);
+Y_out = abs(fft(audioOut)/L);
+P_out = Y_out(1:L/2+1);
+
+subplot(2,2,3);
+plot(f, P_in);
+title('Original Spectrum');
+xlabel('Frequency [Hz]'); ylabel('|P(f)|'); grid on;
+
+subplot(2,2,4);
+plot(f, P_out, 'r');
+title('Filtered Spectrum');
+xlabel('Frequency [Hz]'); ylabel('|P(f)|'); grid on;
+
+% 7. Export Coefficients for SystemVerilog (Q1.15 Format)
+% Scaling floating point coefficients to 16-bit signed integers
+h_fixed = round(h * (2^15 - 1));
+disp('--- Copy these coefficients to your SystemVerilog code ---');
+for i = 1:length(h_fixed)
+    fprintf("assign coeff[%2d] = 16'h%04x; // Decimal: %d\n", i-1, typecast(int16(h_fixed(i)), 'uint16'), h_fixed(i));
+end
+
+
